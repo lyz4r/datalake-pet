@@ -184,11 +184,6 @@ services:
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
     restart: "no"
-    healthcheck:
-      test: ["CMD-SHELL", "airflow db check"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
     networks: [datalake-pet]
 
   # ---------- Airflow Webserver ----------
@@ -199,7 +194,7 @@ services:
     container_name: airflow-webserver
     depends_on:
       airflow-init:
-        condition: service_healthy
+        condition: service_completed_successfully
     command: webserver
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
@@ -225,7 +220,7 @@ services:
     container_name: airflow-scheduler
     depends_on:
       airflow-init:
-        condition: service_healthy
+        condition: service_completed_successfully
     command: scheduler
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
