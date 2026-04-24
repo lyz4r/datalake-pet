@@ -1,28 +1,27 @@
-FROM apache/airflow:2.9.0
+FROM apache/airflow:2.9.3-python3.11
 
 USER root
-
-# Устанавливаем curl (если его нет), скачиваем и распаковываем OpenJDK 11
-RUN apt-get update && apt-get install -y curl && \
-    curl -L -o OpenJDK11.tar.gz https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.20.1%2B1/OpenJDK11U-jdk_x64_linux_hotspot_11.0.20.1_1.tar.gz && \
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    curl -L -o /tmp/OpenJDK11.tar.gz https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.20.1%2B1/OpenJDK11U-jdk_x64_linux_hotspot_11.0.20.1_1.tar.gz && \
     mkdir -p /opt/java/openjdk11 && \
-    tar -xzf OpenJDK11.tar.gz -C /opt/java/openjdk11 --strip-components=1 && \
-    rm OpenJDK11.tar.gz
+    tar -xzf /tmp/OpenJDK11.tar.gz -C /opt/java/openjdk11 --strip-components=1 && \
+    rm /tmp/OpenJDK11.tar.gz && \
+    rm -rf /var/lib/apt/lists/*
 
-# Копируем JAR файлы для Spark (поддержка MinIO и Clickhouse)
 COPY ./spark/jars/aws-java-sdk-bundle-1.12.526.jar /opt/jars/
 COPY ./spark/jars/hadoop-aws-3.3.6.jar /opt/jars/
 COPY ./spark/jars/clickhouse-jdbc-0.5.0-all.jar /opt/jars/
 
-# Устанавливаем переменные окружения для Java и Spark
 ENV JAVA_HOME=/opt/java/openjdk11
-ENV PATH=$JAVA_HOME/bin:$PATH
+ENV PATH="/home/airflow/.local/bin:/opt/java/openjdk11/bin:${PATH}"
 ENV SPARK_EXTRA_JARS=/opt/jars/aws-java-sdk-bundle-1.12.526.jar,/opt/jars/hadoop-aws-3.3.6.jar,/opt/jars/clickhouse-jdbc-0.5.0-all.jar
 
-# Меняем пользователя на airflow для установки python-зависимостей
 USER airflow
-
-# Копируем и устанавливаем Python зависимости
 COPY ./spark/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
+RUN pip install --no-cache-dir \
+    "apache-airflow-providers-postgres==5.11.2" \
+    "apache-airflow-providers-apache-spark==4.8.2" \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-3.11.txt"
+
+RUN pip install --no-cache-dir -r /tmp/requirements.txt

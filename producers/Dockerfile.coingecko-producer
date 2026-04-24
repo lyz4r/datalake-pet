@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Системные зависимости (librdkafka для быстрого kafka-клиента, опционально)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Unbuffered output чтобы docker logs показывал print() сразу
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "coingecko_producer.py"]
