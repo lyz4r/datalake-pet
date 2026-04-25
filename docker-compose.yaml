@@ -32,6 +32,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./logs/producers:/logs
+      - ./producers:/app
     networks: [datalake-pet]
 
   # ---------- Kafka (KRaft, no ZooKeeper) ----------
@@ -234,10 +235,12 @@ services:
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW_CONN_S3_CONN=s3://minio:minio123@minio:9000/
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins
       - ./logs:/opt/airflow/logs
+      - ./producers:/opt/airflow/producers
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8080:8080"
@@ -259,11 +262,14 @@ services:
       - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW_CONN_S3_CONN=s3://minio:minio123@minio:9000/
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - HOST_PROJECT_DIR=${PWD}
+      - PYTHONPATH=/opt/airflow/producers:/opt/airflow
     volumes:
       - ./dags:/opt/airflow/dags
       - ./plugins:/opt/airflow/plugins
       - ./logs:/opt/airflow/logs
+      - ./producers:/opt/airflow/producers
       - /var/run/docker.sock:/var/run/docker.sock
     networks: [datalake-pet]
 
