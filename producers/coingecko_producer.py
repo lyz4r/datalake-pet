@@ -19,11 +19,15 @@ logging.basicConfig(
 URL = 'https://api.coingecko.com/api/v3/coins/markets'
 PARAMS = {"vs_currency": "usd"}
 
+
 def main():
     with KafkaClient() as kafka_client:
         while True:
             try:
-                kafka_client.fetch_and_send(URL, PARAMS, topic="crypto.prices", key="symbol")
+                resp = kafka_client.fetch(
+                    URL, PARAMS)
+                kafka_client.send(iterative=True, resp=resp,
+                                  topic="crypto.prices", key="symbol")
             except Exception as e:
                 logging.error(f"Error in Kafka Coingecko producer: {e}")
             time.sleep(60)

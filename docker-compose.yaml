@@ -11,8 +11,7 @@ volumes:
   superset_home:
   notebooks:
   kafka_data:
-  iceberg-rest:
-  coingecko-producer:     
+  iceberg-rest:   
 
 
 services:
@@ -126,6 +125,7 @@ services:
         mc mb local/bucket/batch_output || true &&
         mc mb local/bucket/kafka_output || true &&
         mc mb local/bucket/warehouse || true &&
+        mc mb local/bucket/bronze || true &&
         exit 0
       "
     networks: [datalake-pet]
@@ -319,18 +319,15 @@ services:
 
   # ---------- Spark Master ----------
   spark:
-    image: apache/spark:3.5.1
+    image: apache/spark:3.5.0
     container_name: spark
     user: root
-    command:
-      - bash
-      - -c
-      - "/opt/spark/sbin/start-master.sh && tail -f /opt/spark/logs/*"
+    command: ["/opt/spark/sbin/start-master.sh"]
     ports:
       - "7077:7077"
       - "8081:8080"
     volumes:
-      - ./spark/jars:/opt/spark/extra-jars       # ← было /opt/spark/jars
+      - ./spark/jars:/opt/spark/extra-jars
       - ./spark/conf/core-site.xml:/opt/spark/conf/core-site.xml
       - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
     environment:
@@ -346,18 +343,15 @@ services:
     networks: [datalake-pet]
 
   spark-worker:
-    image: apache/spark:3.5.1
+    image: apache/spark:3.5.0
     container_name: spark-worker
     user: root
-    command:
-      - bash
-      - -c
-      - "/opt/spark/sbin/start-worker.sh spark://spark:7077 && tail -f /opt/spark/logs/*"
+    command: ["/opt/spark/sbin/start-worker.sh", "spark://spark:7077"]
     depends_on:
       spark:
         condition: service_healthy
     volumes:
-      - ./spark/jars:/opt/spark/extra-jars       # ← было /opt/spark/jars
+      - ./spark/jars:/opt/spark/extra-jars
       - ./spark/conf/core-site.xml:/opt/spark/conf/core-site.xml
       - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
     environment:
@@ -376,10 +370,12 @@ services:
     ports:
       - "8889:8888"
     volumes:
-      - ./notebooks:/home/jovyan/notebooks
+      - ./spark/jobs:/home/jovyan/jobs
       - ./scripts:/home/jovyan/scripts
       - ./spark/jars:/opt/spark/jars
+      - ./spark/jars:/home/jovyan/extra-jars
     environment:
+      - PYSPARK_SUBMIT_ARGS=--jars /home/jovyan/extra-jars/spark-sql-kafka-0-10_2.12-3.5.0.jar,/home/jovyan/extra-jars/spark-token-provider-kafka-0-10_2.12-3.5.0.jar,/home/jovyan/extra-jars/kafka-clients-3.4.1.jar,/home/jovyan/extra-jars/commons-pool2-2.11.1.jar,/home/jovyan/extra-jars/hadoop-aws-3.3.4.jar,/home/jovyan/extra-jars/aws-java-sdk-bundle-1.12.526.jar pyspark-shell
       - SPARK_MASTER=spark://spark:7077
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}

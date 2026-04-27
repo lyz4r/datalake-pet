@@ -1,4 +1,3 @@
-# TODO: надо переработать логику отправки в топик (чтобы было без итерирования)
 from kafka import KafkaProducer
 
 
@@ -17,12 +16,19 @@ class KafkaClient:
             retries=5,
         )
 
-    def fetch_and_send(self, URL : str, params : dict, topic : str, key : str):
+    def fetch(self, URL: str, params: dict) -> requests.Response:
         resp = requests.get(URL, params=params, timeout=10)
         resp.raise_for_status()
-        for value in resp.json():
-            self.producer.send(topic, key=value[key], value=value)
-        
+        return resp
+
+    def send(self, iterative: bool, resp: requests.Response, topic: str, key: str):
+        resp_json = resp.json()
+        if iterative:
+            for value in resp_json:
+                self.producer.send(topic, key=value[key], value=value)
+        else:
+            self.producer.send(topic, key=resp_json[key], value=resp_json)
+
     def __enter__(self):
         return self
 
