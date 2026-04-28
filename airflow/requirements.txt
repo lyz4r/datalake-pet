@@ -1,0 +1,8 @@
+apache-airflow-providers-apache-spark
+apache-airflow-providers-apache-kafka
+apache-airflow-providers-amazon
+apache-airflow-providers-postgres
+apache-airflow-providers-docker
+apache-airflow-providers-http
+clickhouse-connect==0.8.*
+requests==2.32.*

@@ -1,5 +1,0 @@
-запустить в терминале (нужно для работы kafka_to_minio.py)
-
-Invoke-RestMethod -Method Post -Uri http://localhost:8083/connectors/ -ContentType "application/json" -InFile .\pg-connector.json
-
-после запуска через пару секунд в kafka появится новый топик pg.public.orders, к которому уже подключится spark

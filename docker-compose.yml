@@ -1,0 +1,312 @@
+# CryptoFlow MVP stack
+# Versions current as of April 2026
+
+x-airflow-common: &airflow-common
+  build: ./airflow
+  image: apache/airflow:3.2.1
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${POSTGRES_PASSWORD:-airflow}@postgres:5432/airflow
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__PARALLELISM: 8
+    AIRFLOW__API__SECRET_KEY: ${AIRFLOW_API_SECRET:-changeme-please}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-changeme-please-jwt}
+    AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+    AIRFLOW_CONN_KAFKA_DEFAULT: kafka://kafka:9092
+    AIRFLOW_CONN_CLICKHOUSE_DEFAULT: clickhouse://default:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:8123/crypto
+    AIRFLOW_CONN_MINIO_DEFAULT: aws://${MINIO_ROOT_USER:-minioadmin}:${MINIO_ROOT_PASSWORD:-minioadmin}@?endpoint_url=http%3A%2F%2Fminio%3A9000
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - airflow-logs:/opt/airflow/logs
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+
+  # ----------------------------------------------------------------------
+  # METADATA DATABASE (Airflow + Superset)
+  # ----------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-airflow}
+      POSTGRES_MULTIPLE_DATABASES: airflow,superset
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/init-postgres.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------
+  # KAFKA (KRaft single-node, no Zookeeper)
+  # ----------------------------------------------------------------------
+  kafka:
+    image: apache/kafka:4.1.2
+    hostname: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      CLUSTER_ID: "5L6g3nShT-eMCtK--X86sw"
+      KAFKA_HEAP_OPTS: "-Xmx768M -Xms512M"
+    ports:
+      - "29092:29092"  # External access from host
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  kafka-init:
+    image: apache/kafka:4.1.2
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/init/init-kafka.sh"]
+    volumes:
+      - ./infra/init-kafka.sh:/init/init-kafka.sh:ro
+    restart: "no"
+
+  # ----------------------------------------------------------------------
+  # OBJECT STORAGE
+  # ----------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      retries: 10
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/init/init-minio.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - ./infra/init-minio.sh:/init/init-minio.sh:ro
+    restart: "no"
+
+  # ----------------------------------------------------------------------
+  # CLICKHOUSE 25.8 LTS
+  # ----------------------------------------------------------------------
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    hostname: clickhouse
+    environment:
+      CLICKHOUSE_DB: crypto
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+      - "9009:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 10s
+      retries: 10
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------
+  # SPARK 3.5.5 standalone (master + 1 worker)
+  # ----------------------------------------------------------------------
+  spark-master:
+    build: ./spark
+    image: apache/spark:3.5.5
+    command: ["/opt/spark/sbin/start-master.sh"]
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_MASTER_HOST: spark-master
+    ports:
+      - "8081:8080"  # Master UI
+      - "7077:7077"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      retries: 5
+    restart: unless-stopped
+
+  spark-worker:
+    image: apache/spark:3.5.5
+    command: ["/opt/spark/sbin/start-worker.sh", "spark://spark-master:7077"]
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 2g
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Long-running streaming job: Kafka -> S3 Bronze (uncomment after Phase 2)
+  # spark-bronze-streamer:
+  #   image: apache/spark:3.5.5
+  #   depends_on:
+  #     spark-master:
+  #       condition: service_healthy
+  #     kafka:
+  #       condition: service_healthy
+  #     minio-init:
+  #       condition: service_completed_successfully
+  #   environment:
+  #     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+  #     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  #   volumes:
+  #     - ./spark/jobs:/opt/jobs
+  #   command:
+  #     - /opt/spark/bin/spark-submit
+  #     - --master
+  #     - spark://spark-master:7077
+  #     - --conf
+  #     - spark.driver.host=spark-bronze-streamer
+  #     - /opt/jobs/bronze_writer.py
+  #   restart: unless-stopped
+
+  # ----------------------------------------------------------------------
+  # PRODUCERS (Kafka writers, uncomment after Phase 1)
+  # ----------------------------------------------------------------------
+  # producer-binance:
+  #   build: ./producers
+  #   image: apache/producers:latest
+  #   environment:
+  #     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  #     LOG_LEVEL: INFO
+  #   depends_on:
+  #     kafka-init:
+  #       condition: service_completed_successfully
+  #   command: ["python", "binance_ws_producer.py"]
+  #   restart: unless-stopped
+
+  # ----------------------------------------------------------------------
+  # AIRFLOW 3.2.1 (LocalExecutor, all 4 components are required in v3)
+  # ----------------------------------------------------------------------
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create \
+          --username admin --password ${AIRFLOW_ADMIN_PASSWORD:-admin} \
+          --firstname Admin --lastname User --role Admin --email admin@example.com || true
+    restart: "no"
+
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------
+  # SUPERSET 5.0
+  # ----------------------------------------------------------------------
+  superset:
+    build: ./superset
+    image: apache/superset:5.0.0
+    environment:
+      DATABASE_DIALECT: postgresql
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: airflow
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-airflow}
+      DATABASE_DB: superset
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-changeme-please-superset}
+      SUPERSET_LOAD_EXAMPLES: "no"
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      ADMIN_EMAIL: admin@example.com
+    ports:
+      - "8088:8088"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  kafka-data:
+  minio-data:
+  clickhouse-data:
+  airflow-logs:
+
+networks:
+  default:
+    name: crypto-flow
