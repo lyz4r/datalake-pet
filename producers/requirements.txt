@@ -1,4 +1,5 @@
-confluent-kafka==2.8.*
-websocket-client==1.8.*
+websockets==16.*
 requests==2.32.*
 orjson==3.10.*
+kafka-python==2.3.*
+python-socks[asyncio]==2.*

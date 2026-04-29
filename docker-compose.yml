@@ -207,17 +207,17 @@ services:
   # ----------------------------------------------------------------------
   # PRODUCERS (Kafka writers, uncomment after Phase 1)
   # ----------------------------------------------------------------------
-  # producer-binance:
-  #   build: ./producers
-  #   image: apache/producers:latest
-  #   environment:
-  #     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-  #     LOG_LEVEL: INFO
-  #   depends_on:
-  #     kafka-init:
-  #       condition: service_completed_successfully
-  #   command: ["python", "binance_ws_producer.py"]
-  #   restart: unless-stopped
+  producer-bybit:
+    build: ./producers
+    image: apache/producers:latest
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LOG_LEVEL: INFO
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    command: ["python", "bybit_ws_producer.py"]
+    restart: unless-stopped
 
   # ----------------------------------------------------------------------
   # AIRFLOW 3.2.1 (LocalExecutor, all 4 components are required in v3)
