@@ -25,14 +25,14 @@ async def connect_to_bybit(uri: str, subscribe_msg: dict):
             async with websockets.connect(uri) as ws:
                 log.info("Connected")
                 await ws.send(orjson.dumps(subscribe_msg))
-                log.debug("Sent subscription: %s", subscribe_msg)
+                log.info("Sent subscription: %s", subscribe_msg)
                 async for raw in ws:
                     msg = orjson.loads(raw)
                     producer.send(KAFKA_TOPIC, value=msg)
         except websockets.exceptions.InvalidStatus as e:
             log.error(f"Крымчанам соболезную: {e}")
         except Exception as e:
-            log.error(f"Could not connect to bybit WebSocket: {e}")
+            log.error(f"Could not connect to Bybit WebSocket: {e}")
 
 
 if __name__ == "__main__":

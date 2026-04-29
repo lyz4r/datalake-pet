@@ -14,6 +14,9 @@ class KafkaClient:
             retries=5,
         )
 
+    def send(self, topic, value=None, key=None):
+        self.producer.send(topic, value=value, key=key)
+
     def __enter__(self):
         return self
 

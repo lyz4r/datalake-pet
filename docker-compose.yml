@@ -180,42 +180,43 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Long-running streaming job: Kafka -> S3 Bronze (uncomment after Phase 2)
-  # spark-bronze-streamer:
-  #   image: apache/spark:3.5.5
-  #   depends_on:
-  #     spark-master:
-  #       condition: service_healthy
-  #     kafka:
-  #       condition: service_healthy
-  #     minio-init:
-  #       condition: service_completed_successfully
-  #   environment:
-  #     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-  #     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-  #   volumes:
-  #     - ./spark/jobs:/opt/jobs
-  #   command:
-  #     - /opt/spark/bin/spark-submit
-  #     - --master
-  #     - spark://spark-master:7077
-  #     - --conf
-  #     - spark.driver.host=spark-bronze-streamer
-  #     - /opt/jobs/bronze_writer.py
-  #   restart: unless-stopped
+
+  spark-bronze-streamer:
+    image: apache/spark:3.5.5
+    depends_on:
+      spark-master:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - ./spark/jobs:/opt/jobs
+    command:
+      - /opt/spark/bin/spark-submit
+      - --master
+      - spark://spark-master:7077
+      - --conf
+      - spark.driver.host=spark-bronze-streamer
+      - /opt/jobs/bronze_writer.py
+    restart: unless-stopped
 
   # ----------------------------------------------------------------------
   # PRODUCERS (Kafka writers, uncomment after Phase 1)
   # ----------------------------------------------------------------------
   producer-bybit:
     build: ./producers
-    image: apache/producers:latest
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LOG_LEVEL: INFO
     depends_on:
       kafka-init:
         condition: service_completed_successfully
+    volumes:
+      - ./producers:/producers
     command: ["python", "bybit_ws_producer.py"]
     restart: unless-stopped
 
@@ -299,6 +300,20 @@ services:
       clickhouse:
         condition: service_healthy
     restart: unless-stopped
+
+  jupyter:
+      build: ./jupyter
+      environment:
+        AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+        AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      ports:
+        - "8888:8888"
+        - "4040:4040"
+      volumes:
+        - ./notebooks:/home/spark/notebooks
+        - ./spark/jobs:/opt/jobs
+      working_dir: /home/spark/notebooks
+      restart: unless-stopped
 
 volumes:
   postgres-data:
