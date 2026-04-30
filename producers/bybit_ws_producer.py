@@ -32,7 +32,9 @@ async def connect_to_bybit(uri: str, subscribe_msg: dict):
         except websockets.exceptions.InvalidStatus as e:
             log.error(f"Крымчанам соболезную: {e}")
         except Exception as e:
-            log.error(f"Could not connect to Bybit WebSocket: {e}")
+            log.error(
+                f"Could not connect to Bybit WebSocket: {e}, reconnecting in 5s")
+            await asyncio.sleep(5)
 
 
 if __name__ == "__main__":
