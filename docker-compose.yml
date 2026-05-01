@@ -12,6 +12,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__SECRET_KEY: ${AIRFLOW_API_SECRET:-changeme-please}
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-changeme-please-jwt}
     AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW_CONN_KAFKA_DEFAULT: kafka://kafka:9092
     AIRFLOW_CONN_CLICKHOUSE_DEFAULT: clickhouse://default:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:8123/crypto
     AIRFLOW_CONN_MINIO_DEFAULT: aws://${MINIO_ROOT_USER:-minioadmin}:${MINIO_ROOT_PASSWORD:-minioadmin}@?endpoint_url=http%3A%2F%2Fminio%3A9000
@@ -241,10 +242,14 @@ services:
     command:
       - -c
       - |
-        airflow db migrate &&
+        airflow db migrate && \
         airflow users create \
-          --username admin --password ${AIRFLOW_ADMIN_PASSWORD:-admin} \
-          --firstname Admin --lastname User --role Admin --email admin@example.com || true
+        --username admin \
+        --firstname Peter \
+        --lastname Parker \
+        --role Admin \
+        --email spiderman@superhero.org \
+        --password admin || true
     restart: "no"
 
   airflow-apiserver:
