@@ -1,5 +1,4 @@
 # CryptoFlow MVP stack
-# Versions current as of April 2026
 
 x-airflow-common: &airflow-common
   build: ./airflow
@@ -45,7 +44,7 @@ services:
     restart: unless-stopped
 
   # ----------------------------------------------------------------------
-  # KAFKA (KRaft single-node, no Zookeeper)
+  # KAFKA
   # ----------------------------------------------------------------------
   kafka:
     image: apache/kafka:4.1.2
@@ -205,7 +204,7 @@ services:
     restart: unless-stopped
 
   # ----------------------------------------------------------------------
-  # PRODUCERS (Kafka writers, uncomment after Phase 1)
+  # PRODUCERS
   # ----------------------------------------------------------------------
   producer-bybit:
     build: ./producers
@@ -220,8 +219,21 @@ services:
     command: ["python", "bybit_ws_producer.py"]
     restart: unless-stopped
 
+  producer-coingecko:
+    build: ./producers
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LOG_LEVEL: INFO
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./producers:/producers
+    command: ["python", "coingecko_polling_producer.py"]
+    restart: unless-stopped
+
   # ----------------------------------------------------------------------
-  # AIRFLOW 3.2.1 (LocalExecutor, all 4 components are required in v3)
+  # AIRFLOW 3.2.1
   # ----------------------------------------------------------------------
   airflow-init:
     <<: *airflow-common
