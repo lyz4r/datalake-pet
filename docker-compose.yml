@@ -204,6 +204,29 @@ services:
       - /opt/jobs/bronze_writer.py
     restart: unless-stopped
 
+  spark-silver-processor:
+    image: apache/spark:3.5.5
+    depends_on:
+      spark-master:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - ./spark/jobs:/opt/jobs
+    command:
+      - /opt/spark/bin/spark-submit
+      - --master
+      - spark://spark-master:7077
+      - --conf
+      - spark.driver.host=spark-silver-processor
+      - /opt/jobs/silver_processor.py
+    restart: unless-stopped
+
   # ----------------------------------------------------------------------
   # PRODUCERS
   # ----------------------------------------------------------------------
