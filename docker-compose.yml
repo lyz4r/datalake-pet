@@ -201,7 +201,7 @@ services:
       - spark://spark-master:7077
       - --conf
       - spark.driver.host=spark-bronze-streamer
-      - /opt/jobs/bronze_writer.py
+      - /opt/jobs/bronze_tickers_writer.py
     restart: unless-stopped
 
   spark-silver-processor:
