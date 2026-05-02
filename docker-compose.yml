@@ -233,6 +233,19 @@ services:
     command: ["python", "coingecko_polling_producer.py"]
     restart: unless-stopped
 
+  producer-ohlcv:
+    build: ./producers
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LOG_LEVEL: INFO
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./producers:/producers
+    command: ["python", "coingecko_ohlcv_producer.py"]
+    restart: unless-stopped
+
   # ----------------------------------------------------------------------
   # AIRFLOW 3.2.1
   # ----------------------------------------------------------------------

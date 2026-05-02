@@ -3,3 +3,4 @@ requests==2.32.*
 orjson==3.10.*
 kafka-python==2.3.*
 python-socks[asyncio]==2.*
+schedule==1.*
