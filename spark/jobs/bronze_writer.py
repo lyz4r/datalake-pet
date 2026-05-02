@@ -1,5 +1,12 @@
+import logging
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+log = logging.getLogger("bronze_writer")
 
 PACKAGES = ",".join([
     "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5",
@@ -25,6 +32,8 @@ TOPIC = "crypto.tickers"
 CHECKPOINT_PATH = f"s3a://spark-checkpoints/bronze{TOPIC}"
 BRONZE_PATH = f"s3a://crypto-lake/bronze/{TOPIC}"
 
+log.info("Starting bronze writer: topic=%s, output=%s", TOPIC, BRONZE_PATH)
+
 source = (spark.readStream.format("kafka")
           .option("kafka.bootstrap.servers", "kafka:9092")
           .option("subscribe", TOPIC)
@@ -47,4 +56,15 @@ write = (parsed.writeStream.format("parquet")
          .outputMode("append")
          .start())
 
+log.info("Stream query started: id=%s", write.id)
 write.awaitTermination()
+
+progress = write.lastProgress
+if progress:
+    log.info(
+        "Stream finished: batches=%s, input_rows=%s, output_rows=%s",
+        progress.get("batchId"),
+        progress.get("numInputRows"),
+        progress["sink"].get("numOutputRows") if progress.get("sink") else "n/a",
+    )
+log.info("Bronze writer done")
