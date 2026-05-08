@@ -1,18 +1,18 @@
 import logging
 import pyspark.sql.functions as F
 from pyspark.sql.types import StructType, StructField, StringType, DecimalType, LongType
-from utils.spark_session import create_spark
+from utils.spark_session import createSpark
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-log = logging.getLogger("silver_processor")
+log = logging.getLogger("silver_tickers_processor")
 
-spark = create_spark()
+spark = createSpark()
 
 df = spark.read.parquet("s3a://crypto-lake/bronze/crypto.tickers/")
-bronze_schema = df.schema  # сериализованная схема, господи прости
+bronze_schema = df.schema  # сериализованная схема
 
 
 TOPIC = "crypto.tickers"
@@ -47,7 +47,8 @@ PRICE_T = DecimalType(18, 8)
 VOL_T = DecimalType(22, 4)
 PCT_T = DecimalType(10, 6)
 
-log.info("Starting silver processor: topic=%s, bronze=%s, silver=%s", TOPIC, BRONZE_PATH, SILVER_PATH)
+log.info("Starting silver processor: topic=%s, bronze=%s, silver=%s",
+         TOPIC, BRONZE_PATH, SILVER_PATH)
 
 source = (spark.readStream
           .format("parquet")
@@ -98,6 +99,7 @@ if progress:
         "Stream finished: batches=%s, input_rows=%s, output_rows=%s",
         progress.get("batchId"),
         progress.get("numInputRows"),
-        progress["sink"].get("numOutputRows") if progress.get("sink") else "n/a",
+        progress["sink"].get("numOutputRows") if progress.get(
+            "sink") else "n/a",
     )
 log.info("Silver processor done")

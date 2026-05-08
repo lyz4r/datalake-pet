@@ -1,6 +1,6 @@
 import logging
-from utils.spark_session import create_spark
-from utils.bronze_writer import start_bronze_stream
+from utils.spark_session import createSpark
+from utils.bronze_stream import startBronzeStream
 
 logging.basicConfig(
     level=logging.INFO,
@@ -10,13 +10,13 @@ log = logging.getLogger("bronze_writer")
 
 TOPICS = [
     "crypto.tickers",
-    "crypto.ohlcv",
+    # "crypto.ohlcv",
     "crypto.prices",
 ]
 
 if __name__ == "__main__":
-    spark = create_spark()
-    queries = [start_bronze_stream(spark, t) for t in TOPICS]
+    spark = createSpark()
+    queries = [startBronzeStream(spark, t) for t in TOPICS]
 
     for q in queries:
         q.awaitTermination()

@@ -7,7 +7,7 @@ _PACKAGES = ",".join([
 ])
 
 
-def create_spark():
+def createSpark():
     spark = (SparkSession.builder
              .appName("dev")
              .master("local[*]")

@@ -2,7 +2,7 @@
 
 x-airflow-common: &airflow-common
   build: ./airflow
-  image: apache/airflow:3.2.1
+  image: crypto-flow/airflow:3.2.1
   environment: &airflow-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${POSTGRES_PASSWORD:-airflow}@postgres:5432/airflow
@@ -16,8 +16,14 @@ x-airflow-common: &airflow-common
     AIRFLOW_CONN_KAFKA_DEFAULT: kafka://kafka:9092
     AIRFLOW_CONN_CLICKHOUSE_DEFAULT: clickhouse://default:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:8123/crypto
     AIRFLOW_CONN_MINIO_DEFAULT: aws://${MINIO_ROOT_USER:-minioadmin}:${MINIO_ROOT_PASSWORD:-minioadmin}@?endpoint_url=http%3A%2F%2Fminio%3A9000
+    AIRFLOW_CONN_SPARK_DEFAULT: spark://spark-master:7077
+    PYTHONPATH: /opt/airflow
+    AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
   volumes:
     - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/include:/opt/airflow/include
+    - ./spark/jobs:/opt/jobs
     - airflow-logs:/opt/airflow/logs
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
@@ -143,6 +149,8 @@ services:
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./clickhouse/config.d:/etc/clickhouse-server/config.d:ro
+      - ./clickhouse/users.d:/etc/clickhouse-server/users.d
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
       interval: 10s
@@ -201,10 +209,10 @@ services:
       - spark://spark-master:7077
       - --conf
       - spark.driver.host=spark-bronze-streamer
-      - /opt/jobs/bronze_tickers_writer.py
+      - /opt/jobs/bronze_writer.py
     restart: unless-stopped
 
-  spark-silver-processor:
+  spark-silver-tickers:
     image: apache/spark:3.5.5
     depends_on:
       spark-master:
@@ -223,8 +231,31 @@ services:
       - --master
       - spark://spark-master:7077
       - --conf
-      - spark.driver.host=spark-silver-processor
-      - /opt/jobs/silver_processor.py
+      - spark.driver.host=spark-silver-tickers
+      - /opt/jobs/silver_tickers_processor.py
+    restart: unless-stopped
+
+  spark-silver-prices:
+    image: apache/spark:3.5.5
+    depends_on:
+      spark-master:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - ./spark/jobs:/opt/jobs
+    command:
+      - /opt/spark/bin/spark-submit
+      - --master
+      - spark://spark-master:7077
+      - --conf
+      - spark.driver.host=spark-silver-prices
+      - /opt/jobs/silver_prices_processor.py
     restart: unless-stopped
 
   # ----------------------------------------------------------------------

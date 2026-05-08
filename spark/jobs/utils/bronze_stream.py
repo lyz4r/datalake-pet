@@ -4,7 +4,7 @@ import pyspark.sql.functions as F
 log = logging.getLogger("bronze_writer")
 
 
-def start_bronze_stream(spark, topic):
+def startBronzeStream(spark, topic):
     checkpoint_path = f"s3a://spark-checkpoints/bronze/{topic}"
     bronze_path = f"s3a://crypto-lake/bronze/{topic}"
 

@@ -1,0 +1,1 @@
+GRANT NAMED COLLECTION ON minio_lake TO default;
