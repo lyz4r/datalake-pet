@@ -1,3 +1,5 @@
+# НЕ РАБОТАЕТ
+
 import argparse
 import json
 from pyspark.sql import SparkSession
@@ -19,7 +21,8 @@ def main():
     args = parse_args()
     coin_ids = json.loads(args.coin_ids)
 
-    spark = SparkSession.builder.appName("gold_prices_aggregator").getOrCreate()
+    spark = SparkSession.builder.appName(
+        "gold_prices_aggregator").getOrCreate()
     spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
 
     silver = (

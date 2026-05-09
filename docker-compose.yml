@@ -9,12 +9,15 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__PARALLELISM: 8
+    environment:
+    AIRFLOW__API__BASE_URL: http://airflow-apiserver:8080
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
     AIRFLOW__API__SECRET_KEY: ${AIRFLOW_API_SECRET:-changeme-please}
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-changeme-please-jwt}
     AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW_CONN_KAFKA_DEFAULT: kafka://kafka:9092
-    AIRFLOW_CONN_CLICKHOUSE_DEFAULT: clickhouse://default:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:8123/crypto
+    AIRFLOW_CONN_CLICKHOUSE_DEFAULT: clickhouse://default:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:9000/crypto
     AIRFLOW_CONN_MINIO_DEFAULT: aws://${MINIO_ROOT_USER:-minioadmin}:${MINIO_ROOT_PASSWORD:-minioadmin}@?endpoint_url=http%3A%2F%2Fminio%3A9000
     AIRFLOW_CONN_SPARK_DEFAULT: spark://spark-master:7077
     PYTHONPATH: /opt/airflow
