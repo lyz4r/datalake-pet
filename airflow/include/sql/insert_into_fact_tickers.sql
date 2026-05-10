@@ -1,4 +1,4 @@
-INSERT INTO crypto.fact_tickers (
+INSERT INTO crypto_gold.fact_tickers (
         bucket_start,
         symbol,
         open_price,

@@ -1,4 +1,4 @@
-INSERT INTO crypto.dim_coin
+INSERT INTO crypto_gold.dim_coin
 WITH today_data AS (
     SELECT
         coin_id,

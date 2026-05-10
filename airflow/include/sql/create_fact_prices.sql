@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS crypto.fact_prices
+CREATE TABLE IF NOT EXISTS crypto_gold.fact_prices
 (
     snapshot_ts                DateTime64(3, 'UTC'),
     snapshot_date              Date MATERIALIZED toDate(snapshot_ts),

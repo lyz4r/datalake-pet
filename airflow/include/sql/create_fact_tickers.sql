@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS crypto.fact_tickers(
+CREATE TABLE IF NOT EXISTS crypto_gold.fact_tickers(
     bucket_start DateTime64(9),
     symbol LowCardinality(String),
     open_price DECIMAL(18, 8),

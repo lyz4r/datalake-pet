@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS crypto.dim_coin
+CREATE TABLE IF NOT EXISTS crypto_gold.dim_coin
 (
     coin_id            LowCardinality(String),
     symbol             LowCardinality(String),

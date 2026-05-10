@@ -1,8 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.utils.task_group import TaskGroup
 from airflow_clickhouse_plugin.operators.clickhouse import ClickHouseOperator
+
+default_args = {
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+    'retry_exponential_backoff': True,
+    'max_retry_delay': timedelta(hours=1),
+}
+
 
 with DAG(
     dag_id="gold_prices",
@@ -10,6 +18,12 @@ with DAG(
     start_date=datetime(2026, 5, 1),
     catchup=True,
     schedule="@daily",
+    default_args={
+        'retries': 3,
+        'retry_delay': timedelta(minutes=5),
+        'retry_exponential_backoff': True,
+        'max_retry_delay': timedelta(hours=1),
+    },
     template_searchpath="/opt/airflow/include/sql"
 ) as dag:
 
@@ -38,4 +52,10 @@ with DAG(
         )
         create_table >> insert_data
 
-    dim_coin >> fact_prices
+    backup_data = ClickHouseOperator(
+        task_id="backup_gold",
+        sql="backup_gold.sql",
+        clickhouse_conn_id="clickhouse_default"
+    )
+
+    dim_coin >> fact_prices >> backup_data

@@ -1,4 +1,4 @@
-INSERT INTO crypto.fact_prices
+INSERT INTO crypto_gold.fact_prices
 SELECT
     event_time                                        AS snapshot_ts,
     coin_id,
