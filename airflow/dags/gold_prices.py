@@ -52,10 +52,10 @@ with DAG(
         )
         create_table >> insert_data
 
-    backup_data = ClickHouseOperator(
-        task_id="backup_gold",
-        sql="backup_gold.sql",
-        clickhouse_conn_id="clickhouse_default"
-    )
+    # backup_data = ClickHouseOperator(
+    #     task_id="backup_gold",
+    #     sql="backup_gold.sql",
+    #     clickhouse_conn_id="clickhouse_default"
+    # )
 
-    dim_coin >> fact_prices >> backup_data
+    dim_coin >> fact_prices  # >> backup_data

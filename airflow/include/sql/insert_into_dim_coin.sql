@@ -8,9 +8,9 @@ WITH today_data AS (
         argMax(max_supply, event_time) AS max_supply,
         toDate(min(event_time))        AS today_first,
         toDate(max(event_time))        AS today_last
-    FROM s3(
-        'http://minio:9000/crypto-lake/silver/crypto.prices/**/*.parquet',
-        'minioadmin', 'minioadmin', 'Parquet'
+    FROM icebergS3(
+    'http://minio:9000/iceberg-lakehouse/warehouse/silver/prices/',
+    'minioadmin', 'minioadmin', 'Parquet'
     )
     WHERE year  = {{ logical_date.year }}
       AND month = {{ logical_date.month }}
@@ -21,7 +21,7 @@ WITH today_data AS (
 ),
 existing AS (
     SELECT coin_id, min(first_seen_date) AS first_seen_date
-    FROM crypto.dim_coin FINAL
+    FROM crypto_gold.dim_coin FINAL
     GROUP BY coin_id
 )
 SELECT

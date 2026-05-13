@@ -24,8 +24,8 @@ SELECT
     atl_change_pct,
     toDate(atl_date)                                  AS atl_date,
     now64()                                           AS _ingested_at
-FROM s3(
-    'http://minio:9000/crypto-lake/silver/crypto.prices/**/*.parquet',
+FROM icebergS3(
+    'http://minio:9000/iceberg-lakehouse/warehouse/silver/prices/',
     'minioadmin', 'minioadmin', 'Parquet'
 )
 WHERE year = {{ logical_date.year }}

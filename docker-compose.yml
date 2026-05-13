@@ -234,7 +234,7 @@ services:
       - spark://spark-master:7077
       - --conf
       - spark.driver.host=spark-silver-tickers
-      - /opt/jobs/silver_tickers_processor.py
+      - /opt/jobs/silver_iceberg_tickers.py
     restart: unless-stopped
 
   spark-silver-prices:
@@ -257,7 +257,7 @@ services:
       - spark://spark-master:7077
       - --conf
       - spark.driver.host=spark-silver-prices
-      - /opt/jobs/silver_prices_processor.py
+      - /opt/jobs/silver_iceberg_prices.py
     restart: unless-stopped
 
   # ----------------------------------------------------------------------
@@ -363,6 +363,34 @@ services:
   # ----------------------------------------------------------------------
   # SUPERSET 5.0
   # ----------------------------------------------------------------------
+  superset-init:
+    build: ./superset
+    image: apache/superset:5.0.0
+    environment:
+      DATABASE_DIALECT: postgresql
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: airflow
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-airflow}
+      DATABASE_DB: superset
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-changeme-please-superset}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        superset db upgrade && \
+        superset fab create-admin \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --email admin@example.com \
+          --password ${SUPERSET_ADMIN_PASSWORD:-admin} || true && \
+        superset init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   superset:
     build: ./superset
     image: apache/superset:5.0.0
@@ -375,9 +403,6 @@ services:
       DATABASE_DB: superset
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-changeme-please-superset}
       SUPERSET_LOAD_EXAMPLES: "no"
-      ADMIN_USERNAME: admin
-      ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
-      ADMIN_EMAIL: admin@example.com
     ports:
       - "8088:8088"
     depends_on:
@@ -385,6 +410,8 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
+      superset-init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   jupyter:

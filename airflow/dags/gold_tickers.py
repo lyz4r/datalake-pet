@@ -29,11 +29,11 @@ with DAG(
         retry_delay=timedelta(minutes=5),
         clickhouse_conn_id="clickhouse_default"
     )
-    backup_data = ClickHouseOperator(
-        task_id="backup_gold",
-        sql="backup_gold.sql",
-        retries=3,
-        retry_delay=timedelta(minutes=5),
-        clickhouse_conn_id="clickhouse_default"
-    )
-    create_mart >> insert_data >> backup_data
+    # backup_data = ClickHouseOperator(
+    #     task_id="backup_gold",
+    #     sql="backup_gold.sql",
+    #     retries=3,
+    #     retry_delay=timedelta(minutes=5),
+    #     clickhouse_conn_id="clickhouse_default"
+    # )
+    create_mart >> insert_data  # >> backup_data

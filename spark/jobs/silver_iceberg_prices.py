@@ -1,31 +1,17 @@
-import logging
-from pyspark.sql import functions as F
+from utils.spark_iceberg_session import create_session
+import pyspark.sql.functions as F
 from pyspark.sql.types import (
     StructType, StructField, StringType, ArrayType,
     DecimalType, FloatType, IntegerType
 )
-from utils.spark_session import createSpark
 
+spark = create_session()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-log = logging.getLogger("silver_prices_processor")
+TOPIC = "prices"
+CHECKPOINT_BRONZE_PATH = f"s3a://spark-checkpoints/lakehouse/bronze/{TOPIC}_raw"
+CHECKPOINT_SILVER_PATH = f"s3a://spark-checkpoints/lakehouse/silver/{TOPIC}"
 
-PRICE_T, CAP_T, VOL_T, SUPPLY_T = (
-    DecimalType(28, 8), DecimalType(28, 2),
-    DecimalType(28, 2), DecimalType(28, 8),
-)
-PCT_T, RANK_T = FloatType(), IntegerType()
-
-TOPIC = "crypto.prices"
-CHECKPOINT_BRONZE_PATH = f"s3a://spark-checkpoints/bronze/{TOPIC}"
-CHECKPOINT_SILVER_PATH = f"s3a://spark-checkpoints/silver/{TOPIC}"
-BRONZE_PATH = f"s3a://crypto-lake/bronze/{TOPIC}"
-SILVER_PATH = f"s3a://crypto-lake/silver/{TOPIC}"
-
-
+# схема вложенной структуры полезной нагрузки
 coin_schema = StructType([
     StructField("id", StringType()),
     StructField("symbol", StringType()),
@@ -55,13 +41,18 @@ coin_schema = StructType([
 ])
 payload_schema = ArrayType(coin_schema)
 
-spark = createSpark()
 
-bronze = (spark.readStream
-          .schema(spark.read.parquet(BRONZE_PATH).schema)
-          .parquet(BRONZE_PATH))
+source = (spark.readStream
+          .format("iceberg")
+          .load(f"lake.bronze.{TOPIC}_raw"))
 
-clean = (bronze
+PRICE_T, CAP_T, VOL_T, SUPPLY_T = (
+    DecimalType(28, 8), DecimalType(28, 2),
+    DecimalType(28, 2), DecimalType(28, 8),
+)
+PCT_T, RANK_T = FloatType(), IntegerType()
+
+clean = (source
          .withColumn("arr", F.from_json("raw_json", payload_schema))
          .withColumn("p", F.explode("arr"))
          .select(
@@ -110,23 +101,11 @@ clean = (bronze
          )
 
 write = (clean.writeStream
-         .format("parquet")
-         .option("path", SILVER_PATH)
+         .format("iceberg")
          .option("checkpointLocation", CHECKPOINT_SILVER_PATH)
-         .partitionBy("coin_id", "year", "month", "day")
-         .trigger(processingTime="60 seconds")
-         .start())
+         .option("fanout-enabled", "true")
+         .trigger(availableNow=True)
+         .outputMode("append")
+         .toTable(f"lake.silver.{TOPIC}"))
 
-log.info("Stream query started: id=%s", write.id)
 write.awaitTermination()
-
-progress = write.lastProgress
-if progress:
-    log.info(
-        "Stream finished: batches=%s, input_rows=%s, output_rows=%s",
-        progress.get("batchId"),
-        progress.get("numInputRows"),
-        progress["sink"].get("numOutputRows") if progress.get(
-            "sink") else "n/a",
-    )
-log.info("Silver processor done")
