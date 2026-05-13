@@ -1,4 +1,4 @@
-CREATE TABLE silver_tickers_s3 (
+CREATE TABLE crypto.silver_tickers_s3 (
     ingestion_ts Nullable(DateTime64(9)),
     kafka_ts Nullable(DateTime64(9)),
     event_time Nullable(DateTime64(9)),

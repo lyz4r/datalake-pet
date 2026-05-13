@@ -9,7 +9,7 @@ done
 echo "[minio-init] Creating buckets..."
 mc mb -p local/crypto-lake          || true
 mc mb -p local/spark-checkpoints    || true
-mc mb -p local/iceberg-warehouse    || true
+mc mb -p local/iceberg-lakehouse    || true
 
 echo "[minio-init] Buckets:"
 mc ls local
