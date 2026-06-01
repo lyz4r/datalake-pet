@@ -28,7 +28,16 @@ async def connect_to_bybit(uri: str, subscribe_msg: dict):
                 log.info("Sent subscription: %s", subscribe_msg)
                 async for raw in ws:
                     msg = orjson.loads(raw)
-                    producer.send(KAFKA_TOPIC, value=msg)
+                    data = msg.get("data")
+                    if not isinstance(data, dict):
+                        continue
+                    flat = {
+                        "symbol":     data.get("symbol"),
+                        "price":      data.get("lastPrice"),
+                        "volume_24h": data.get("volume24h"),
+                        "event_time": str(msg.get("ts", "")),
+                    }
+                    producer.send(KAFKA_TOPIC, value=flat)
         except websockets.exceptions.InvalidStatus as e:
             log.error(f"Крымчанам соболезную: {e}")
         except Exception as e:

@@ -25,6 +25,8 @@
 - В BI **Superset** можно создать дашборды на таблицы из *Clickhouse*.
 ![пример дашборда](img/dashboard.png)
 
+TODO: сделать объединение маленьких паркетников раз в день
+
 
 ```
 Bybit WS / CoinGecko API
