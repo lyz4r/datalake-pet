@@ -521,6 +521,19 @@ services:
       - jobmanager
     restart: unless-stopped
 
+  tg-bot:
+    build: ./tg_bot
+    environment:
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SUBSCRIBERS_DB: /data/subscribers.db
+    volumes:
+      - tg-bot-data:/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
   flink-price-alerts:
     build:
       context: ./flink
@@ -545,6 +558,7 @@ volumes:
   airflow-logs:
   prometheus-data:
   grafana-data:
+  tg-bot-data:
 
 networks:
   default:

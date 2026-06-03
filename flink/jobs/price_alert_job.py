@@ -16,7 +16,7 @@ from pyflink.common.typeinfo import Types
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-PRICE_DELTA_THRESHOLD = 0.001
+PRICE_DELTA_THRESHOLD = 0.01
 
 
 @dataclass
