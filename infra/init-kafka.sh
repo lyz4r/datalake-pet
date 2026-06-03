@@ -28,6 +28,7 @@ create_topic crypto.prices    3   604800000   # 7 days
 create_topic crypto.trades    6   86400000    # 1 day
 create_topic crypto.ohlcv     3   2592000000  # 30 days
 create_topic crypto.sentiment 1   7776000000  # 90 days
+create_topic crypto.alerts    1   86400000    # 1 day
 
 echo "[kafka-init] Topics:"
 $KAFKA_BIN/kafka-topics.sh --bootstrap-server $BOOTSTRAP --list
